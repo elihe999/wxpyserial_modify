@@ -48,6 +48,8 @@ ID_TERM = wx.NewId()
 ID_EXIT = wx.NewId()
 ID_RTS = wx.NewId()
 ID_DTR = wx.NewId()
+# ext
+ID_X1 = wx.NewId()
 
 NEWLINE_CR = 0
 NEWLINE_LF = 1
@@ -88,6 +90,7 @@ class TerminalSettingsDialog(wx.Dialog):
         self.checkbox_echo.SetValue(self.settings.echo)
         self.checkbox_unprintable.SetValue(self.settings.unprintable)
         self.radio_box_newline.SetSelection(self.settings.newline)
+
 
     def __set_properties(self):
         # begin wxGlade: TerminalSettingsDialog.__set_properties
@@ -141,6 +144,7 @@ class TerminalFrame(wx.Frame):
         self.settings = TerminalSetup()  # placeholder for the settings
         self.thread = None
         self.alive = threading.Event()
+        self.recordFlag = False
         # begin wxGlade: TerminalFrame.__init__
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
@@ -149,6 +153,7 @@ class TerminalFrame(wx.Frame):
         self.frame_terminal_menubar = wx.MenuBar()
         wxglade_tmp_menu = wx.Menu()
         wxglade_tmp_menu.Append(ID_CLEAR, "&Clear", "", wx.ITEM_NORMAL)
+        wxglade_tmp_menu.Append(ID_SESSIONLOG, "&Record Text To...", "", wx.ITEM_CHECK)
         wxglade_tmp_menu.Append(ID_SAVEAS, "&Save Text As...", "", wx.ITEM_NORMAL)
         wxglade_tmp_menu.AppendSeparator()
         wxglade_tmp_menu.Append(ID_TERM, "&Terminal Settings...", "", wx.ITEM_NORMAL)
@@ -160,6 +165,9 @@ class TerminalFrame(wx.Frame):
         wxglade_tmp_menu.Append(ID_DTR, "&DTR", "", wx.ITEM_CHECK)
         wxglade_tmp_menu.Append(ID_SETTINGS, "&Port Settings...", "", wx.ITEM_NORMAL)
         self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Serial Port")
+        wxglade_tmp_menu = wx.Menu()
+        wxglade_tmp_menu.Append(ID_X1, "&Check GS_Process", "", wx.ITEM_CHECK)
+        self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Test Function")
         self.SetMenuBar(self.frame_terminal_menubar)
         # Menu Bar end
         self.text_ctrl_output = wx.TextCtrl(self, -1, "", style=wx.TE_MULTILINE | wx.TE_READONLY)
@@ -169,11 +177,17 @@ class TerminalFrame(wx.Frame):
 
         self.Bind(wx.EVT_MENU, self.OnClear, id=ID_CLEAR)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, id=ID_SAVEAS)
+        self.Bind(wx.EVT_MENU, self.OnRecordOn, id=ID_SESSIONLOG)
         self.Bind(wx.EVT_MENU, self.OnTermSettings, id=ID_TERM)
         self.Bind(wx.EVT_MENU, self.OnExit, id=ID_EXIT)
         self.Bind(wx.EVT_MENU, self.OnRTS, id=ID_RTS)
         self.Bind(wx.EVT_MENU, self.OnDTR, id=ID_DTR)
         self.Bind(wx.EVT_MENU, self.OnPortSettings, id=ID_SETTINGS)
+        # 
+        self.Bind(wx.EVT_MENU, self.OnX1FuncEnable, id=ID_X1)
+
+        #
+        self.seekTermKeyword = False
         # end wxGlade
         self.__attach_events()          # register events
         self.OnPortSettings(None)       # call setup dialog on startup, opens port
@@ -253,7 +267,8 @@ class TerminalFrame(wx.Frame):
                     # screen.attach(stream)
                     # stream.process(self.text_ctrl_output.GetValue())
                     # todo: get window size
-                    screen = pyte.Screen(60, 24)
+                    wxwinsize = wx.Frame.GetSize(self)
+                    screen = pyte.Screen(int(wxwinsize[0]/2), int(wxwinsize[1]/2))
                     stream = pyte.Stream(screen)
                     stream.feed(text)
                     self.writeScreenToFile(f, screen.display)
@@ -263,7 +278,7 @@ class TerminalFrame(wx.Frame):
         """Using VT102 Clean the vt100 Format"""
         if fp != None and len(srceen_list) > 0:
             for idx, line in enumerate(srceen_list, 0):
-                print(line.strip())
+                # print(line.strip())
                 fp.writelines(line.strip())
                 fp.write("\n")
         # Remember to close pointer
@@ -343,13 +358,46 @@ class TerminalFrame(wx.Frame):
         else:
             char = chr(code)
             if self.settings.echo:          # do echo if needed
-                self.WriteText(char)
+                self.WriteMyText(char)
             self.serial.write(char.encode('UTF-8', 'replace'))         # send the character
 
-    def WriteText(self, text):
+    def WriteMyText(self, text):
         if self.settings.unprintable:
             text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
         self.text_ctrl_output.AppendText(text)
+
+    def WriteText(self, text):
+        # wxwinsize = wx.Frame.GetSize(self)
+        # screen = pyte.Screen(int(wxwinsize[0]), int(wxwinsize[1]))
+        # stream = pyte.Stream(screen)
+        # if self.settings.unprintable:
+        #     text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
+        # stream.feed(text)
+        
+        if self.recordFlag:
+            fp = open("temp.log", "a+")
+        if self.settings.unprintable:
+            text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
+
+        if self.seekTermKeyword:
+            print("Checking...")
+            serach_flag = text.strip().find("No process: gs_avs.")
+            if serach_flag >= 0:
+                print("tttt")
+        self.text_ctrl_output.AppendText(text)
+        # for idx, line in enumerate(screen.display, 0):
+        #     if line.strip() != "":
+        #         if self.seekTermKeyword:
+        #             serach_flag = line.strip().find("No process: gs_avs")
+        #             if serach_flag >= 0:
+        #                 print("tttt")
+
+        #         self.text_ctrl_output.AppendText(line.strip() + "\n")
+        #         if self.recordFlag and fp != None:
+        #             fp.write(line.strip() + "\n")
+
+        if self.recordFlag:
+            fp.close()
 
     def OnSerialRead(self, event):
         """Handle input from the serial port."""
@@ -377,7 +425,19 @@ class TerminalFrame(wx.Frame):
         self.serial.rts = event.IsChecked()
 
     def OnDTR(self, event):  # wxGlade: TerminalFrame.<event_handler>
-        self.serial.dtr = event.Checked()
+        self.serial.dtr = event.IsChecked()
+
+    def OnRecordOn(self, event):
+        if event.IsChecked():
+            self.recordFlag = True
+        else:
+            self.recordFlag = False
+
+    def OnX1FuncEnable(self, event):
+        if event.IsChecked():
+            self.seekTermKeyword = True
+        else:
+            self.seekTermKeyword = False
 
 # end of class TerminalFrame
 
