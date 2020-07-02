@@ -110,7 +110,9 @@ class SerialConfigDialog(wx.Dialog):
             self.combo_box_baudrate.Clear()
             for n, baudrate in enumerate(self.serial.BAUDRATES):
                 self.combo_box_baudrate.Append(str(baudrate))
-                if self.serial.baudrate == baudrate:
+                # if self.serial.baudrate == baudrate:
+                #     preferred_index = n
+                if str(baudrate) == "115200":
                     preferred_index = n
             if preferred_index is not None:
                 self.combo_box_baudrate.SetSelection(preferred_index)

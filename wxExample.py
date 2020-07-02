@@ -19,6 +19,9 @@ import wxSerialConfigDialog
 # access the GUI without crashing. wxMutexGuiEnter/wxMutexGuiLeave
 # could be used too, but an event is more elegant.
 
+import pyte #
+# import vt102
+
 SERIALRX = wx.NewEventType()
 # bind to serial data receive events
 EVT_SERIALRX = wx.PyEventBinder(SERIALRX, 0)
@@ -243,8 +246,27 @@ class TerminalFrame(wx.Frame):
             if dlg.ShowModal() == wx.ID_OK:
                 filename = dlg.GetPath()
                 with codecs.open(filename, 'w', encoding='utf-8') as f:
-                    text = self.text_ctrl_output.GetValue().encode("utf-8")
-                    f.write(text.decode("gbk"))
+                    text = self.text_ctrl_output.GetValue()
+                    screen_len = text.count( "\n", 0, len(text) )
+                    # stream = vt102.stream()
+                    # screen = vt102.screen((screen_len + 2, 80))
+                    # screen.attach(stream)
+                    # stream.process(self.text_ctrl_output.GetValue())
+                    # todo: get window size
+                    screen = pyte.Screen(60, 24)
+                    stream = pyte.Stream(screen)
+                    stream.feed(text)
+                    self.writeScreenToFile(f, screen.display)
+                
+
+    def writeScreenToFile(self, fp, srceen_list):
+        """Using VT102 Clean the vt100 Format"""
+        if fp != None and len(srceen_list) > 0:
+            for idx, line in enumerate(srceen_list, 0):
+                print(line.strip())
+                fp.writelines(line.strip())
+                fp.write("\n")
+        # Remember to close pointer
 
     def OnClear(self, event):  # wxGlade: TerminalFrame.<event_handler>
         """Clear contents of output window."""
