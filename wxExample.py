@@ -19,7 +19,7 @@ import wxSerialConfigDialog
 # access the GUI without crashing. wxMutexGuiEnter/wxMutexGuiLeave
 # could be used too, but an event is more elegant.
 
-import pyte #
+import pyte
 # import vt102
 
 SERIALRX = wx.NewEventType()
@@ -185,7 +185,6 @@ class TerminalFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnPortSettings, id=ID_SETTINGS)
         # 
         self.Bind(wx.EVT_MENU, self.OnX1FuncEnable, id=ID_X1)
-
         #
         self.seekTermKeyword = False
         # end wxGlade
@@ -193,6 +192,9 @@ class TerminalFrame(wx.Frame):
         self.OnPortSettings(None)       # call setup dialog on startup, opens port
         if not self.alive.isSet():
             self.Close()
+
+        # seek string
+        self.temp_string = ""
 
     def StartThread(self):
         """Start the receiver thread"""
@@ -278,9 +280,7 @@ class TerminalFrame(wx.Frame):
         """Using VT102 Clean the vt100 Format"""
         if fp != None and len(srceen_list) > 0:
             for idx, line in enumerate(srceen_list, 0):
-                # print(line.strip())
                 fp.writelines(line.strip())
-                fp.write("\n")
         # Remember to close pointer
 
     def OnClear(self, event):  # wxGlade: TerminalFrame.<event_handler>
@@ -367,35 +367,14 @@ class TerminalFrame(wx.Frame):
         self.text_ctrl_output.AppendText(text)
 
     def WriteText(self, text):
-        # wxwinsize = wx.Frame.GetSize(self)
-        # screen = pyte.Screen(int(wxwinsize[0]), int(wxwinsize[1]))
-        # stream = pyte.Stream(screen)
-        # if self.settings.unprintable:
-        #     text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
-        # stream.feed(text)
-        
         if self.recordFlag:
             fp = open("temp.log", "a+")
         if self.settings.unprintable:
             text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
-
-        if self.seekTermKeyword:
-            print("Checking...")
-            serach_flag = text.strip().find("No process: gs_avs.")
-            if serach_flag >= 0:
-                print("tttt")
         self.text_ctrl_output.AppendText(text)
-        # for idx, line in enumerate(screen.display, 0):
-        #     if line.strip() != "":
-        #         if self.seekTermKeyword:
-        #             serach_flag = line.strip().find("No process: gs_avs")
-        #             if serach_flag >= 0:
-        #                 print("tttt")
 
-        #         self.text_ctrl_output.AppendText(line.strip() + "\n")
-        #         if self.recordFlag and fp != None:
-        #             fp.write(line.strip() + "\n")
-
+        if self.recordFlag:
+            fp.write(text)
         if self.recordFlag:
             fp.close()
 
