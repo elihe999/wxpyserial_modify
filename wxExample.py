@@ -22,9 +22,7 @@ import wxSerialConfigDialog
 import pyte
 # import vt102
 
-import socket
-import time
-import threading
+from myServer import Server
 
 serversocket = None
 
@@ -203,6 +201,7 @@ class TerminalFrame(wx.Frame):
         self.temp_string = ""
         self.clean_flag = False
         self.find_flag = False
+        self.server = Server(7777)
 
     def StartThread(self):
         """Start the receiver thread"""
@@ -437,12 +436,12 @@ class TerminalFrame(wx.Frame):
             self.clean_flag = True
         elif self.temp_string.find("QCoreApplication::postEvent:") != -1:
             self.find_flag = True
-            print("test")
-            self.lauchServer("ringing")
+
+        if self.find_flag:
+            self.lauchServer("findError")
 
     def lauchServer(self, msg):
-        global serversocket
-        serversocket.sendto(msg.encode("utf-8"), ("192.168.92.210", 7777))
+        self.server.announce(msg.encode("utf-8"), ("192.168.92.210", 7777))
 # end of class TerminalFrame
 
 
@@ -457,14 +456,5 @@ class MyApp(wx.App):
 # end of class MyApp
 
 if __name__ == "__main__":
-    serversocket
-    addr=(socket.gethostname(), 7778)
-    serversocket = socket.socket(
-                    socket.AF_INET, socket.SOCK_STREAM)
-    serversocket.bind(addr)
-    serversocket.listen(5)
     app = MyApp(0)
     app.MainLoop()
-    
-    conn,addr=serversocket.accept()
-    serversocket.close()
