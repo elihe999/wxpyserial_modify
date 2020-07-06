@@ -60,7 +60,6 @@ NEWLINE_CR = 0
 NEWLINE_LF = 1
 NEWLINE_CRLF = 2
 
-
 class TerminalSetup:
     """
     Placeholder for various terminal settings. Used to pass the
@@ -205,6 +204,7 @@ class TerminalFrame(wx.Frame):
         self.clean_flag = False
         self.find_flag = False
         self.server = Server(7777)
+        self.recordname = "" # save as 
 
     def StartThread(self):
         """Start the receiver thread"""
@@ -382,7 +382,7 @@ class TerminalFrame(wx.Frame):
 
     def WriteText(self, text):
         if self.recordFlag:
-            fp = open("temp.log", "a+")
+            fp = open(self.recordname, "a+")
         if self.settings.unprintable:
             text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
         self.text_ctrl_output.AppendText(text)
@@ -425,6 +425,16 @@ class TerminalFrame(wx.Frame):
     def OnRecordOn(self, event):
         if event.IsChecked():
             self.recordFlag = True
+            with wx.FileDialog(
+                None,
+                "Save Text As...",
+                ".",
+                "",
+                "Text File|*.txt|All Files|*",
+                wx.FD_SAVE) as dlg:
+                if dlg.ShowModal() == wx.ID_OK:
+                    self.recordname = dlg.GetPath()
+                    
         else:
             self.recordFlag = False
 
