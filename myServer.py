@@ -19,9 +19,9 @@ class Server:
     def run(self):
         while True:
             recvData, clientInfo = self.sock.recvfrom(1024)
-            print(recvData.decode())
+            # print(recvData.decode())
             msg = self.msg
-            print(msg)
+            # print(msg)
             self.sock.sendto(msg,clientInfo)
             # c, a = self.sock.accept()
             # self.cThread = threading.Thread(target=self.handler, args=(c,a))

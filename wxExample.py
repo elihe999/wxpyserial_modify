@@ -435,17 +435,40 @@ class TerminalFrame(wx.Frame):
             self.seekTermKeyword = False
 
     def SeekEightBitSubString(self, newstr):
-        if self.clean_flag:
+        search_list = self.ReadConfigFile()
+        if newstr.find("\n") != -1:
+            temp = newstr.split("\n", 1)
+            self.temp_string = self.temp_string + temp[0]
+            for item in search_list:
+                if self.temp_string.find(item) != -1:
+                    self.find_flag = True
+                    break
             self.temp_string = ""
-            self.clean_flag = False
-        self.temp_string = self.temp_string + newstr
-        if self.temp_string.find("\n") != -1:
-            self.clean_flag = True
-        elif self.temp_string.find("QCoreApplication::postEvent:") != -1:
-            self.find_flag = True
+            self.temp_string = self.temp_string + temp[1]
+        else:
+            self.temp_string = self.temp_string + newstr
+
+        for item in search_list:
+            if self.temp_string.find(item) != -1:
+                self.find_flag = True
+                break
 
         if self.find_flag:
-            self.lauchServer("findError")
+            print("find")
+            self.lauchServer("ringing")
+
+    def ReadConfigFile(self) -> list:
+        f = None
+        temp = []
+        try:
+            f = open('config.txt', 'r')
+            for line in f.readlines():
+                line = line.strip()
+                temp.append(line)
+        finally:
+            if f:
+                f.close()
+            return temp
 
     def lauchServer(self, msg):
         self.server.announce(msg.encode("utf-8"), ("192.168.92.210", 7777))
@@ -509,7 +532,7 @@ class KeywordDialog(wx.Dialog):
             self.list1.append(new_str)
             self.m_lbox1.Append(new_str)
             for line in self.list1:
-                fw.write(line)
+                fw.write(line + "\n")
         finally:
             if fw:
                 fw.close()
