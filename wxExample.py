@@ -465,7 +465,7 @@ class TerminalFrame(wx.Frame):
 
         if self.find_flag:
             print("find")
-            self.lauchServer("ringing")
+            self.lauchServer("threadCrash")
 
     def ReadConfigFile(self) -> list:
         f = None
