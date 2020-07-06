@@ -54,6 +54,7 @@ ID_RTS = wx.NewId()
 ID_DTR = wx.NewId()
 # ext
 ID_X1 = wx.NewId()
+ID_X1SETTING = wx.NewId()
 
 NEWLINE_CR = 0
 NEWLINE_LF = 1
@@ -171,6 +172,7 @@ class TerminalFrame(wx.Frame):
         self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Serial Port")
         wxglade_tmp_menu = wx.Menu()
         wxglade_tmp_menu.Append(ID_X1, "&Check GS_Process", "", wx.ITEM_CHECK)
+        wxglade_tmp_menu.Append(ID_X1SETTING, "&GS_Process Setting", "", wx.ITEM_NORMAL)
         self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Test Function")
         self.SetMenuBar(self.frame_terminal_menubar)
         # Menu Bar end
@@ -189,6 +191,7 @@ class TerminalFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.OnPortSettings, id=ID_SETTINGS)
         # 
         self.Bind(wx.EVT_MENU, self.OnX1FuncEnable, id=ID_X1)
+        self.Bind(wx.EVT_MENU, self.OnExtSetting, id=ID_X1SETTING)
         #
         self.seekTermKeyword = False
         # end wxGlade
@@ -281,7 +284,6 @@ class TerminalFrame(wx.Frame):
                     stream = pyte.Stream(screen)
                     stream.feed(text)
                     self.writeScreenToFile(f, screen.display)
-                
 
     def writeScreenToFile(self, fp, srceen_list):
         """Using VT102 Clean the vt100 Format"""
@@ -342,6 +344,11 @@ class TerminalFrame(wx.Frame):
         with the current terminal settings.
         """
         with TerminalSettingsDialog(self, -1, "", settings=self.settings) as dialog:
+            dialog.CenterOnParent()
+            dialog.ShowModal()
+
+    def OnExtSetting(self, event):
+        with KeywordDialog(self, -1, "", settings=self.settings) as dialog:
             dialog.CenterOnParent()
             dialog.ShowModal()
 
@@ -444,6 +451,68 @@ class TerminalFrame(wx.Frame):
         self.server.announce(msg.encode("utf-8"), ("192.168.92.210", 7777))
 # end of class TerminalFrame
 
+ID_ADDKEY = wx.NewId()
+class KeywordDialog(wx.Dialog):
+
+    def __init__(self, *args, **kwds):
+        self.settings = kwds['settings']
+        del kwds['settings']
+        # begin wxGlade: TerminalSettingsDialog.__init__
+        kwds["style"] = wx.DEFAULT_DIALOG_STYLE
+        wx.Dialog.__init__(self, *args, **kwds)
+
+        self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
+        gSizer1 = wx.GridSizer( 3, 3, 0, 0 )
+
+        self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Add New Keyword", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_staticText1.Wrap( -1 )
+
+        gSizer1.Add( self.m_staticText1, 0, wx.ALL, 5 )
+
+        self.m_textCtrl1 = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_textCtrl1.SetInsertionPoint(0)
+        gSizer1.Add( self.m_textCtrl1, 0, wx.ALL, 5 )
+
+        self.m_button1 = wx.Button( self, ID_ADDKEY, u"Add", wx.DefaultPosition, wx.DefaultSize, 0 )
+        gSizer1.Add( self.m_button1, 0, wx.ALL, 5 )
+
+        self.list1 = []
+        self.ReadConfigFile()
+        self.m_lbox1 = wx.ListBox(self, -1, choices=self.list1, style=wx.LB_SINGLE)
+        gSizer1.Add( self.m_lbox1, 0, wx.ALL, 5 )
+
+        self.SetSizer( gSizer1 )
+        self.Layout()
+        self.Centre( wx.BOTH )
+
+        self.Bind( wx.EVT_BUTTON, self.OnAddButtonClicked, self.m_button1 )  
+
+    def OnAddButtonClicked(self, event):
+        source_id = event
+        print( self.m_textCtrl1.GetValue() )
+        self.WriteConfigFile(self.m_textCtrl1.GetValue())
+
+    def ReadConfigFile(self):
+        f = None
+        try:
+            f = open('config.txt', 'a+')
+            for line in f.readlines():
+                line = line.strip()
+                self.list1.append(line)
+        finally:
+            if f:
+                f.close()
+
+    def WriteConfigFile(self, new_str):
+        try:
+            fw = open('config.txt', 'a+')
+            self.list1.append(new_str)
+            self.m_lbox1.Append(new_str)
+            for line in self.list1:
+                fw.write(line)
+        finally:
+            if fw:
+                fw.close()
 
 class MyApp(wx.App):
     def OnInit(self):
