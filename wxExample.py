@@ -11,6 +11,7 @@ import codecs
 import serial
 import threading
 import wx
+import wx.grid
 import wxSerialConfigDialog
 
 # ----------------------------------------------------------------------
@@ -511,8 +512,32 @@ class KeywordDialog(wx.Dialog):
 
         self.list1 = []
         self.ReadConfigFile()
-        self.m_lbox1 = wx.ListBox(self, -1, choices=self.list1, style=wx.LB_SINGLE)
-        gSizer1.Add( self.m_lbox1, 0, wx.ALL, 5 )
+
+        self.m_grid1 = wx.grid.Grid( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
+
+        # Grid
+        self.m_grid1.CreateGrid( 2, 2 )
+        self.m_grid1.EnableEditing( True )
+        self.m_grid1.EnableGridLines( True )
+        self.m_grid1.EnableDragGridSize( False )
+        self.m_grid1.SetMargins( 0, 0 )
+
+        # Columns
+        self.m_grid1.EnableDragColMove( False )
+        self.m_grid1.EnableDragColSize( True )
+        self.m_grid1.SetColLabelSize( 30 )
+        self.m_grid1.SetColLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
+
+        # Rows
+        self.m_grid1.EnableDragRowSize( True )
+        self.m_grid1.SetRowLabelSize( 80 )
+        self.m_grid1.SetRowLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
+
+        # Label Appearance
+
+        # Cell Defaults
+        self.m_grid1.SetDefaultCellAlignment( wx.ALIGN_LEFT, wx.ALIGN_TOP )
+        gSizer1.Add( self.m_grid1, 0, wx.ALL, 5 )
 
         self.SetSizer( gSizer1 )
         self.Layout()
