@@ -462,6 +462,7 @@ class TerminalFrame(wx.Frame):
         for item in search_list:
             if self.temp_string.find(item) != -1:
                 self.find_flag = True
+                print(item)
                 break
 
         if self.find_flag:
@@ -511,12 +512,14 @@ class KeywordDialog(wx.Dialog):
         gSizer1.Add( self.m_button1, 0, wx.ALL, 5 )
 
         self.list1 = []
-        self.ReadConfigFile()
+        self.list1 = self.ReadConfigFile()
 
         self.m_grid1 = wx.grid.Grid( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
 
         # Grid
-        self.m_grid1.CreateGrid( 2, 2 )
+        temp_grid_lenght = len(self.list1)
+        print(temp_grid_lenght)
+        self.m_grid1.CreateGrid( temp_grid_lenght, 2 ) 
         self.m_grid1.EnableEditing( True )
         self.m_grid1.EnableGridLines( True )
         self.m_grid1.EnableDragGridSize( False )
@@ -534,6 +537,10 @@ class KeywordDialog(wx.Dialog):
         self.m_grid1.SetRowLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
 
         # Label Appearance
+        index = 0
+        for name in self.list1:
+            self.m_grid1.SetCellValue(index, 0, name)
+            index = index + 1
 
         # Cell Defaults
         self.m_grid1.SetDefaultCellAlignment( wx.ALIGN_LEFT, wx.ALIGN_TOP )
@@ -552,14 +559,16 @@ class KeywordDialog(wx.Dialog):
 
     def ReadConfigFile(self):
         f = None
+        temp_list = []
         try:
-            f = open('config.txt', 'a+')
+            f = open('config.txt', 'r')
             for line in f.readlines():
                 line = line.strip()
-                self.list1.append(line)
+                temp_list.append(line)
         finally:
             if f:
                 f.close()
+            return temp_list
 
     def WriteConfigFile(self, new_str):
         try:
