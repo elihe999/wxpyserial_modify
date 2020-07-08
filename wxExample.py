@@ -11,6 +11,7 @@ import codecs
 import serial
 import threading
 import wx
+import wx.grid
 import wxSerialConfigDialog
 
 # ----------------------------------------------------------------------
@@ -18,6 +19,13 @@ import wxSerialConfigDialog
 # this is required as on some platforms only the main thread can
 # access the GUI without crashing. wxMutexGuiEnter/wxMutexGuiLeave
 # could be used too, but an event is more elegant.
+
+import pyte
+# import vt102
+
+from myServer import Server
+
+serversocket = None
 
 SERIALRX = wx.NewEventType()
 # bind to serial data receive events
@@ -45,11 +53,13 @@ ID_TERM = wx.NewId()
 ID_EXIT = wx.NewId()
 ID_RTS = wx.NewId()
 ID_DTR = wx.NewId()
+# ext
+ID_X1 = wx.NewId()
+ID_X1SETTING = wx.NewId()
 
 NEWLINE_CR = 0
 NEWLINE_LF = 1
 NEWLINE_CRLF = 2
-
 
 class TerminalSetup:
     """
@@ -85,6 +95,7 @@ class TerminalSettingsDialog(wx.Dialog):
         self.checkbox_echo.SetValue(self.settings.echo)
         self.checkbox_unprintable.SetValue(self.settings.unprintable)
         self.radio_box_newline.SetSelection(self.settings.newline)
+
 
     def __set_properties(self):
         # begin wxGlade: TerminalSettingsDialog.__set_properties
@@ -138,6 +149,7 @@ class TerminalFrame(wx.Frame):
         self.settings = TerminalSetup()  # placeholder for the settings
         self.thread = None
         self.alive = threading.Event()
+        self.recordFlag = False
         # begin wxGlade: TerminalFrame.__init__
         kwds["style"] = wx.DEFAULT_FRAME_STYLE
         wx.Frame.__init__(self, *args, **kwds)
@@ -146,6 +158,7 @@ class TerminalFrame(wx.Frame):
         self.frame_terminal_menubar = wx.MenuBar()
         wxglade_tmp_menu = wx.Menu()
         wxglade_tmp_menu.Append(ID_CLEAR, "&Clear", "", wx.ITEM_NORMAL)
+        wxglade_tmp_menu.Append(ID_SESSIONLOG, "&Record Text To...", "", wx.ITEM_CHECK)
         wxglade_tmp_menu.Append(ID_SAVEAS, "&Save Text As...", "", wx.ITEM_NORMAL)
         wxglade_tmp_menu.AppendSeparator()
         wxglade_tmp_menu.Append(ID_TERM, "&Terminal Settings...", "", wx.ITEM_NORMAL)
@@ -157,6 +170,10 @@ class TerminalFrame(wx.Frame):
         wxglade_tmp_menu.Append(ID_DTR, "&DTR", "", wx.ITEM_CHECK)
         wxglade_tmp_menu.Append(ID_SETTINGS, "&Port Settings...", "", wx.ITEM_NORMAL)
         self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Serial Port")
+        wxglade_tmp_menu = wx.Menu()
+        wxglade_tmp_menu.Append(ID_X1, "&Check GS_Process", "", wx.ITEM_CHECK)
+        wxglade_tmp_menu.Append(ID_X1SETTING, "&GS_Process Setting", "", wx.ITEM_NORMAL)
+        self.frame_terminal_menubar.Append(wxglade_tmp_menu, "Test Function")
         self.SetMenuBar(self.frame_terminal_menubar)
         # Menu Bar end
         self.text_ctrl_output = wx.TextCtrl(self, -1, "", style=wx.TE_MULTILINE | wx.TE_READONLY)
@@ -166,16 +183,29 @@ class TerminalFrame(wx.Frame):
 
         self.Bind(wx.EVT_MENU, self.OnClear, id=ID_CLEAR)
         self.Bind(wx.EVT_MENU, self.OnSaveAs, id=ID_SAVEAS)
+        self.Bind(wx.EVT_MENU, self.OnRecordOn, id=ID_SESSIONLOG)
         self.Bind(wx.EVT_MENU, self.OnTermSettings, id=ID_TERM)
         self.Bind(wx.EVT_MENU, self.OnExit, id=ID_EXIT)
         self.Bind(wx.EVT_MENU, self.OnRTS, id=ID_RTS)
         self.Bind(wx.EVT_MENU, self.OnDTR, id=ID_DTR)
         self.Bind(wx.EVT_MENU, self.OnPortSettings, id=ID_SETTINGS)
+        # 
+        self.Bind(wx.EVT_MENU, self.OnX1FuncEnable, id=ID_X1)
+        self.Bind(wx.EVT_MENU, self.OnExtSetting, id=ID_X1SETTING)
+        #
+        self.seekTermKeyword = False
         # end wxGlade
         self.__attach_events()          # register events
         self.OnPortSettings(None)       # call setup dialog on startup, opens port
         if not self.alive.isSet():
             self.Close()
+
+        # seek string
+        self.temp_string = ""
+        self.clean_flag = False
+        self.find_flag = False
+        self.server = Server(7777)
+        self.recordname = "" # save as 
 
     def StartThread(self):
         """Start the receiver thread"""
@@ -243,8 +273,25 @@ class TerminalFrame(wx.Frame):
             if dlg.ShowModal() == wx.ID_OK:
                 filename = dlg.GetPath()
                 with codecs.open(filename, 'w', encoding='utf-8') as f:
-                    text = self.text_ctrl_output.GetValue().encode("utf-8")
-                    f.write(text.decode("gbk"))
+                    text = self.text_ctrl_output.GetValue()
+                    screen_len = text.count( "\n", 0, len(text) )
+                    # stream = vt102.stream()
+                    # screen = vt102.screen((screen_len + 2, 80))
+                    # screen.attach(stream)
+                    # stream.process(self.text_ctrl_output.GetValue())
+                    # todo: get window size
+                    wxwinsize = wx.Frame.GetSize(self)
+                    screen = pyte.Screen(int(wxwinsize[0]/2), int(wxwinsize[1]/2))
+                    stream = pyte.Stream(screen)
+                    stream.feed(text)
+                    self.writeScreenToFile(f, screen.display)
+
+    def writeScreenToFile(self, fp, srceen_list):
+        """Using VT102 Clean the vt100 Format"""
+        if fp != None and len(srceen_list) > 0:
+            for idx, line in enumerate(srceen_list, 0):
+                fp.writelines(line.strip())
+        # Remember to close pointer
 
     def OnClear(self, event):  # wxGlade: TerminalFrame.<event_handler>
         """Clear contents of output window."""
@@ -301,6 +348,11 @@ class TerminalFrame(wx.Frame):
             dialog.CenterOnParent()
             dialog.ShowModal()
 
+    def OnExtSetting(self, event):
+        with KeywordDialog(self, -1, "", settings=self.settings) as dialog:
+            dialog.CenterOnParent()
+            dialog.ShowModal()
+
     def OnKey(self, event):
         """\
         Key event handler. If the key is in the ASCII range, write it to the
@@ -321,13 +373,27 @@ class TerminalFrame(wx.Frame):
         else:
             char = chr(code)
             if self.settings.echo:          # do echo if needed
-                self.WriteText(char)
+                self.WriteMyText(char)
             self.serial.write(char.encode('UTF-8', 'replace'))         # send the character
 
-    def WriteText(self, text):
+    def WriteMyText(self, text):
         if self.settings.unprintable:
             text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
         self.text_ctrl_output.AppendText(text)
+
+    def WriteText(self, text):
+        if self.recordFlag:
+            fp = open(self.recordname, "a+")
+        if self.settings.unprintable:
+            text = ''.join([c if (c >= ' ' and c != '\x7f') else chr(0x2400 + ord(c)) for c in text])
+        self.text_ctrl_output.AppendText(text)
+
+        if self.recordFlag:
+            fp.write(text)
+        if self.seekTermKeyword:
+            self.SeekEightBitSubString(text)
+        if self.recordFlag:
+            fp.close()
 
     def OnSerialRead(self, event):
         """Handle input from the serial port."""
@@ -355,10 +421,165 @@ class TerminalFrame(wx.Frame):
         self.serial.rts = event.IsChecked()
 
     def OnDTR(self, event):  # wxGlade: TerminalFrame.<event_handler>
-        self.serial.dtr = event.Checked()
+        self.serial.dtr = event.IsChecked()
 
+    def OnRecordOn(self, event):
+        if event.IsChecked():
+            self.recordFlag = True
+            with wx.FileDialog(
+                None,
+                "Save Text As...",
+                ".",
+                "",
+                "Text File|*.txt|All Files|*",
+                wx.FD_SAVE) as dlg:
+                if dlg.ShowModal() == wx.ID_OK:
+                    self.recordname = dlg.GetPath()
+                    
+        else:
+            self.recordFlag = False
+
+    def OnX1FuncEnable(self, event):
+        if event.IsChecked():
+            self.seekTermKeyword = True
+        else:
+            self.seekTermKeyword = False
+
+    def SeekEightBitSubString(self, newstr):
+        search_list = self.ReadConfigFile()
+        if newstr.find("\n") != -1:
+            temp = newstr.split("\n", 1)
+            self.temp_string = self.temp_string + temp[0]
+            for item in search_list:
+                if self.temp_string.find(item) != -1:
+                    self.find_flag = True
+                    break
+            self.temp_string = ""
+            self.temp_string = self.temp_string + temp[1]
+        else:
+            self.temp_string = self.temp_string + newstr
+
+        for item in search_list:
+            if self.temp_string.find(item) != -1:
+                self.find_flag = True
+                print(item)
+                break
+
+        if self.find_flag:
+            print("find")
+            self.lauchServer("threadCrash")
+
+    def ReadConfigFile(self) -> list:
+        f = None
+        temp = []
+        try:
+            f = open('config.txt', 'r')
+            for line in f.readlines():
+                line = line.strip()
+                temp.append(line)
+        finally:
+            if f:
+                f.close()
+            return temp
+
+    def lauchServer(self, msg):
+        self.server.announce(msg.encode("utf-8"), ("192.168.92.210", 7777))
 # end of class TerminalFrame
 
+ID_ADDKEY = wx.NewId()
+class KeywordDialog(wx.Dialog):
+
+    def __init__(self, *args, **kwds):
+        self.settings = kwds['settings']
+        del kwds['settings']
+        # begin wxGlade: TerminalSettingsDialog.__init__
+        kwds["style"] = wx.DEFAULT_DIALOG_STYLE
+        wx.Dialog.__init__(self, *args, **kwds)
+
+        self.SetSizeHints( wx.DefaultSize, wx.DefaultSize )
+        gSizer1 = wx.GridSizer( 3, 3, 0, 0 )
+
+        self.m_staticText1 = wx.StaticText( self, wx.ID_ANY, u"Add New Keyword", wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_staticText1.Wrap( -1 )
+
+        gSizer1.Add( self.m_staticText1, 0, wx.ALL, 5 )
+
+        self.m_textCtrl1 = wx.TextCtrl( self, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
+        self.m_textCtrl1.SetInsertionPoint(0)
+        gSizer1.Add( self.m_textCtrl1, 0, wx.ALL, 5 )
+
+        self.m_button1 = wx.Button( self, ID_ADDKEY, u"Add", wx.DefaultPosition, wx.DefaultSize, 0 )
+        gSizer1.Add( self.m_button1, 0, wx.ALL, 5 )
+
+        self.list1 = []
+        self.list1 = self.ReadConfigFile()
+
+        self.m_grid1 = wx.grid.Grid( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
+
+        # Grid
+        temp_grid_lenght = len(self.list1)
+        print(temp_grid_lenght)
+        self.m_grid1.CreateGrid( temp_grid_lenght, 2 ) 
+        self.m_grid1.EnableEditing( True )
+        self.m_grid1.EnableGridLines( True )
+        self.m_grid1.EnableDragGridSize( False )
+        self.m_grid1.SetMargins( 0, 0 )
+
+        # Columns
+        self.m_grid1.EnableDragColMove( False )
+        self.m_grid1.EnableDragColSize( True )
+        self.m_grid1.SetColLabelSize( 30 )
+        self.m_grid1.SetColLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
+
+        # Rows
+        self.m_grid1.EnableDragRowSize( True )
+        self.m_grid1.SetRowLabelSize( 80 )
+        self.m_grid1.SetRowLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
+
+        # Label Appearance
+        index = 0
+        for name in self.list1:
+            self.m_grid1.SetCellValue(index, 0, name)
+            index = index + 1
+
+        # Cell Defaults
+        self.m_grid1.SetDefaultCellAlignment( wx.ALIGN_LEFT, wx.ALIGN_TOP )
+        gSizer1.Add( self.m_grid1, 0, wx.ALL, 5 )
+
+        self.SetSizer( gSizer1 )
+        self.Layout()
+        self.Centre( wx.BOTH )
+
+        self.Bind( wx.EVT_BUTTON, self.OnAddButtonClicked, self.m_button1 )  
+
+    def OnAddButtonClicked(self, event):
+        source_id = event
+        print( self.m_textCtrl1.GetValue() )
+        self.WriteConfigFile(self.m_textCtrl1.GetValue())
+
+    def ReadConfigFile(self):
+        f = None
+        temp_list = []
+        try:
+            f = open('config.txt', 'r')
+            for line in f.readlines():
+                line = line.strip()
+                temp_list.append(line)
+        finally:
+            if f:
+                f.close()
+            return temp_list
+
+    def WriteConfigFile(self, new_str):
+        try:
+            fw = open('config.txt', 'a+')
+            self.list1.append(new_str)
+            self.m_lbox1.Append(new_str)
+            for line in self.list1:
+                fw.write(line + "\n")
+        finally:
+            if fw:
+                fw.close()
 
 class MyApp(wx.App):
     def OnInit(self):
