@@ -476,7 +476,8 @@ class TerminalFrame(wx.Frame):
             f = open('config.txt', 'r')
             for line in f.readlines():
                 line = line.strip()
-                temp.append(line)
+                if line != "":
+                    temp.append(line)
         finally:
             if f:
                 f.close()
@@ -517,16 +518,16 @@ class KeywordDialog(wx.Dialog):
         self.m_grid1 = wx.grid.Grid( self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, 0 )
 
         # Grid
-        temp_grid_lenght = len(self.list1)
-        print(temp_grid_lenght)
+        temp_grid_lenght = len(self.list1) + 1
         self.m_grid1.CreateGrid( temp_grid_lenght, 2 ) 
         self.m_grid1.EnableEditing( True )
         self.m_grid1.EnableGridLines( True )
-        self.m_grid1.EnableDragGridSize( False )
+        self.m_grid1.EnableDragGridSize( True )
         self.m_grid1.SetMargins( 0, 0 )
 
         # Columns
-        self.m_grid1.EnableDragColMove( False )
+        self.m_grid1.EnableDragColMove( True )
+
         self.m_grid1.EnableDragColSize( True )
         self.m_grid1.SetColLabelSize( 30 )
         self.m_grid1.SetColLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
@@ -564,7 +565,8 @@ class KeywordDialog(wx.Dialog):
             f = open('config.txt', 'r')
             for line in f.readlines():
                 line = line.strip()
-                temp_list.append(line)
+                if line != "":
+                    temp_list.append(line)
         finally:
             if f:
                 f.close()
@@ -572,14 +574,19 @@ class KeywordDialog(wx.Dialog):
 
     def WriteConfigFile(self, new_str):
         try:
-            fw = open('config.txt', 'a+')
-            self.list1.append(new_str)
-            self.m_lbox1.Append(new_str)
-            for line in self.list1:
-                fw.write(line + "\n")
+            fw = open('config.txt', 'w')
+            if new_str.strip() != "":
+                self.list1.append(new_str)
+                self.m_grid1.AppendRows()
+                for line in self.list1:
+                    fw.write(line + "\n")
         finally:
             if fw:
                 fw.close()
+            index = 0
+            for o in self.list1:
+                self.m_grid1.GetTable().SetValue(index, 0, o)
+                index = index + 1
 
 class MyApp(wx.App):
     def OnInit(self):
