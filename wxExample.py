@@ -527,6 +527,7 @@ class KeywordDialog(wx.Dialog):
 
         # Columns
         self.m_grid1.EnableDragColMove( True )
+
         self.m_grid1.EnableDragColSize( True )
         self.m_grid1.SetColLabelSize( 30 )
         self.m_grid1.SetColLabelAlignment( wx.ALIGN_CENTER, wx.ALIGN_CENTER )
